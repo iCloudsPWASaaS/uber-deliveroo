@@ -14,7 +14,12 @@ Route::post('/uber/fetch-stores', [PlaygroundController::class, 'uberFetchStores
 Route::post('/uber/status', [PlaygroundController::class, 'uberStatus'])->name('uber.status');
 Route::post('/uber/menu/pull', [PlaygroundController::class, 'uberMenuPull'])->name('uber.menu.pull');
 Route::post('/uber/menu/push', [PlaygroundController::class, 'uberMenuPush'])->name('uber.menu.push');
+Route::post('/uber/menu/item/save', [PlaygroundController::class, 'uberMenuItemSave'])->name('uber.menu.item.save');
+Route::post('/uber/menu/item/delete', [PlaygroundController::class, 'uberMenuItemDelete'])->name('uber.menu.item.delete');
 Route::post('/uber/order', [PlaygroundController::class, 'uberOrder'])->name('uber.order');
+
+Route::get('/uber/activate', [PlaygroundController::class, 'uberActivate'])->name('uber.activate');
+Route::get('/uber/oauth/callback', [PlaygroundController::class, 'uberOAuthCallback'])->name('uber.oauth.callback');
 
 Route::get('/deliveroo', [PlaygroundController::class, 'deliveroo'])->name('deliveroo');
 Route::post('/deliveroo/connect', [PlaygroundController::class, 'deliverooConnect'])->name('deliveroo.connect');

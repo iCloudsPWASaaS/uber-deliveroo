@@ -42,7 +42,7 @@
 </head>
 <body>
 <header>
-    <h1>MultiVendor Hub &middot; Laravel API</h1>
+    <h1>Uber/Deliveroo Laravel API</h1>
     <nav>
         <a href="{{ route('home') }}" class="{{ request()->routeIs('home') ? 'active' : '' }}">Home</a>
         <a href="{{ route('stores') }}" class="{{ request()->routeIs('stores') ? 'active' : '' }}">Stores</a>

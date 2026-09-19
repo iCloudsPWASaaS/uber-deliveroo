@@ -68,12 +68,13 @@ class WebhookController
     public function deliveroo(Request $request)
     {
         $rawBody = $request->getContent();
-        $signature = $request->header('x-deliveroo-signature') ?? '';
         $secret = config('services.deliveroo.webhook_secret');
 
         if ($secret) {
-            $expected = base64_encode(hash_hmac('sha256', $rawBody, $secret, true));
-            if ($signature !== $expected) {
+            $guid = (string) ($request->header('x-deliveroo-sequence-guid') ?? '');
+            $expected = strtolower((string) ($request->header('x-deliveroo-hmac-sha256') ?? ''));
+
+            if (! $this->verifyDeliverooSignature($rawBody, $guid, $expected, $secret)) {
                 return response()->json(['error' => 'Invalid signature'], 401);
             }
         }
@@ -262,5 +263,17 @@ class WebhookController
             $order->recordStatus($status, $note);
             $order->save();
         }
+    }
+
+    protected function verifyDeliverooSignature(string $body, string $guid, string $expected, string $secret): bool
+    {
+        foreach ([' ', " \n "] as $separator) {
+            $computed = strtolower(hash_hmac('sha256', $guid.$separator.$body, $secret));
+            if ($computed !== '' && hash_equals($computed, $expected)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

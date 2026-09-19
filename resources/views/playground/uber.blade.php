@@ -52,6 +52,9 @@
                 </div>
                 <button type="submit">Save connection</button>
             </form>
+            <div class="row" style="margin-top:12px">
+                <a href="{{ route('uber.activate', ['store' => (string) $store->_id]) }}"><button type="button" class="btn-alt">Activate store via Uber OAuth</button></a>
+            </div>
         </div>
 
         <div class="card">
@@ -93,6 +96,39 @@
                 <input type="hidden" name="store_id" value="{{ (string) $store->_id }}">
                 <button type="submit" class="btn-alt">Push local menu to Uber</button>
             </form>
+            <form method="POST" action="{{ route('uber.menu.item.save') }}" style="margin-top:10px;padding:8px;border:1px dashed #ccc;border-radius:6px">
+                @csrf
+                <input type="hidden" name="store_id" value="{{ (string) $store->_id }}">
+                <strong>Add item</strong>
+                <div class="row">
+                    <div><label>Name</label><input name="name" required></div>
+                    <div><label>Category</label><input name="category" placeholder="Mains"></div>
+                    <div><label>Price (&pound;)</label><input name="basePrice" type="number" step="0.01" min="0" value="0"></div>
+                    <div><label>Description</label><input name="description"></div>
+                    <div><label>Available</label><input type="checkbox" name="isAvailable" value="1" checked></div>
+                </div>
+                <button type="submit">Add item</button>
+            </form>
+
+            @foreach ($menuItems as $mi)
+                <form method="POST" action="{{ route('uber.menu.item.save') }}" style="margin-top:8px;padding:8px;border-top:1px solid #eee">
+                    @csrf
+                    <input type="hidden" name="store_id" value="{{ (string) $store->_id }}">
+                    <input type="hidden" name="item_id" value="{{ (string) $mi->_id }}">
+                    <div class="row">
+                        <div><input name="name" value="{{ $mi->name }}" title="name"></div>
+                        <div><input name="category" value="{{ $mi->category }}" title="category" style="max-width:130px"></div>
+                        <div><input name="basePrice" type="number" step="0.01" min="0" value="{{ number_format(($mi->basePrice ?? 0) / 100, 2, '.', '') }}" title="price (£)" style="max-width:90px"></div>
+                        <div><input name="description" value="{{ $mi->description }}" title="description" placeholder="description"></div>
+                        <div style="display:flex;align-items:center"><label style="margin:0 6px 0 0">Avail.</label><input type="checkbox" name="isAvailable" value="1" {{ $mi->isAvailable ? 'checked' : '' }}></div>
+                        <div style="display:flex;gap:6px">
+                            <button type="submit">Save</button>
+                            <button type="submit" formaction="{{ route('uber.menu.item.delete') }}" onclick="return confirm('Delete \'{{ addslashes($mi->name) }}\'?')">Del</button>
+                        </div>
+                    </div>
+                    @if ($mi->externalId)<div style="font-size:11px;color:#999">Uber id: <code>{{ $mi->externalId }}</code></div>@endif
+                </form>
+            @endforeach
         </div>
 
         <div class="card">

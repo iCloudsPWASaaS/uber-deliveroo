@@ -25,6 +25,7 @@ class MenuItem extends BaseModel
         'prepTime',
         'calories',
         'sortOrder',
+        'externalId',
     ];
 
     protected $casts = [

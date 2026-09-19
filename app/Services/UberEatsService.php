@@ -16,6 +16,11 @@ class UberEatsService
         return rtrim(config('services.uber_eats.api_url', 'https://test-api.uber.com'), '/').'/v1';
     }
 
+    public function apiV2Url(): string
+    {
+        return rtrim(config('services.uber_eats.api_url', 'https://test-api.uber.com'), '/').'/v2';
+    }
+
     public function tokenUrl(): string
     {
         return config('services.uber_eats.token_url', 'https://sandbox-login.uber.com/oauth/v2/token');
@@ -30,7 +35,28 @@ class UberEatsService
             'grant_type' => 'client_credentials',
             'client_id' => $credentials['clientId'] ?? $credentials['apiKey'] ?? '',
             'client_secret' => $credentials['clientSecret'] ?? $credentials['apiSecret'] ?? '',
-            'scope' => 'eats.store',
+            'scope' => 'eats.store eats.store.status.write',
+        ]);
+
+        $response->throw();
+
+        return $response->json();
+    }
+
+    /**
+     * Exchange an authorization code (merchant OAuth consent) for a user token.
+     * Used for the eats.pos_provisioning store-activation flow.
+     */
+    public function exchangeAuthorizationCode(string $code, string $redirectUri): array
+    {
+        $config = config('services.uber_eats');
+
+        $response = Http::asForm()->timeout(15)->post($this->tokenUrl(), [
+            'grant_type' => 'authorization_code',
+            'client_id' => $config['client_id'],
+            'client_secret' => $config['client_secret'],
+            'code' => $code,
+            'redirect_uri' => $redirectUri,
         ]);
 
         $response->throw();
@@ -41,7 +67,7 @@ class UberEatsService
     /**
      * Authenticated request against the Uber Eats v1 API.
      */
-    public function request(string $method, string $path, ?string $token = null, mixed $data = null, array $params = []): mixed
+    public function request(string $method, string $path, ?string $token = null, mixed $data = null, array $params = [], ?string $baseUrl = null): mixed
     {
         $headers = [
             'Content-Type' => 'application/json',
@@ -61,12 +87,24 @@ class UberEatsService
         }
 
         $response = Http::withHeaders($headers)
-            ->timeout(15)
-            ->send(strtoupper($method), $this->apiUrl().$path, $options);
+            ->timeout(20)
+            ->send(strtoupper($method), ($baseUrl ?? $this->apiUrl()).$path, $options);
 
         $response->throw();
 
         return $response->json();
+    }
+
+    /**
+     * Provision a store to this app using the merchant's user token.
+     * POST /eats/stores/{store_id}/pos_data grants the app perpetual
+     * access so client_credentials tokens can manage the store.
+     */
+    public function activateStore(string $storeId, string $userToken, array $data = []): mixed
+    {
+        $this->request('POST', '/eats/stores/'.$storeId.'/pos_data', $userToken, $data ?: ['pos_integration_enabled' => true]);
+
+        return true;
     }
 
     public function errorMessage(Throwable $error): string
@@ -173,7 +211,7 @@ class UberEatsService
 
         try {
             $token = $this->getStoreToken($store);
-            $status = $this->request('GET', "/eats/stores/{$config['storeId']}/status", $token);
+            $status = $this->request('GET', "/eats/store/{$config['storeId']}/status", $token);
 
             return ['success' => true, 'message' => 'Store status retrieved', 'data' => $status];
         } catch (Throwable $error) {
@@ -190,11 +228,16 @@ class UberEatsService
 
         try {
             $token = $this->getStoreToken($store);
-            $result = $this->request('POST', "/eats/stores/{$config['storeId']}/status", $token, $status);
 
-            $store->isOnline = $status['is_online'] ?? $store->isOnline;
+            $online = (bool) ($status['is_online'] ?? true);
+            $paused = (bool) ($status['pause_new_orders'] ?? false);
+            $result = $this->request('POST', "/eats/store/{$config['storeId']}/status", $token, [
+                'status' => $online && ! $paused ? 'ONLINE' : 'PAUSED',
+            ]);
+
+            $store->isOnline = $online;
             $store->isBusy = $status['busy_mode'] ?? $store->isBusy;
-            $store->isPaused = $status['pause_new_orders'] ?? $store->isPaused;
+            $store->isPaused = $paused;
             $store->save();
 
             return ['success' => true, 'message' => 'Store status updated', 'data' => $result];
@@ -212,7 +255,7 @@ class UberEatsService
 
         try {
             $token = $this->getStoreToken($store);
-            $menu = $this->request('GET', "/eats/stores/{$config['storeId']}/menus", $token);
+            $menu = $this->request('GET', "/eats/stores/{$config['storeId']}/menus", $token, null, [], $this->apiV2Url());
 
             return ['success' => true, 'message' => 'Menu retrieved', 'data' => $menu];
         } catch (Throwable $error) {
@@ -229,7 +272,7 @@ class UberEatsService
 
         try {
             $token = $this->getStoreToken($store);
-            $result = $this->request('PUT', "/eats/stores/{$config['storeId']}/menus", $token, $menu);
+            $result = $this->request('PUT', "/eats/stores/{$config['storeId']}/menus", $token, $menu, [], $this->apiV2Url());
 
             return ['success' => true, 'message' => 'Menu pushed to Uber Eats', 'data' => $result];
         } catch (Throwable $error) {

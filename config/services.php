@@ -41,11 +41,13 @@ return [
         'client_id' => env('UBER_EATS_CLIENT_ID'),
         'client_secret' => env('UBER_EATS_CLIENT_SECRET'),
         'webhook_secret' => env('UBER_EATS_WEBHOOK_SECRET'),
+        'redirect_uri' => env('UBER_EATS_REDIRECT_URI'),
         'sandbox' => env('UBER_EATS_SANDBOX', true),
     ],
 
     'deliveroo' => [
         'api_url' => env('DELIVEROO_API_URL', 'https://api.developers.deliveroo.com'),
+        'auth_url' => env('DELIVEROO_AUTH_URL', 'https://auth.developers.deliveroo.com'),
         'client_id' => env('DELIVEROO_CLIENT_ID'),
         'client_secret' => env('DELIVEROO_CLIENT_SECRET'),
         'webhook_secret' => env('DELIVEROO_WEBHOOK_SECRET'),
