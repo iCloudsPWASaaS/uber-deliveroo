@@ -72,7 +72,7 @@ class DeliverooService
     {
         if ($error instanceof RequestException && $error->response) {
             $data = $error->response->json();
-            $message = $data['error']['message'] ?? $data['error']['code'] ?? $data['message'] ?? null;
+            $message = $data['error']['message'] ?? $data['error']['code'] ?? $data['message'] ?? $data['detail'] ?? $data['title'] ?? null;
 
             if ($message) {
                 return $message.' (HTTP '.$error->response->status().')';
@@ -274,14 +274,27 @@ class DeliverooService
                 $status = ($payload['is_online'] ?? true) ? 'OPEN' : 'CLOSED';
             }
 
-            $result = $this->request(
-                'PUT',
-                $this->apiUrl()."/site/v1/brands/{$config['brandId']}/sites/{$config['storeId']}/status",
-                $token,
-                ['status' => $status]
-            );
+            $statusUrl = $this->apiUrl()."/site/v1/brands/{$config['brandId']}/sites/{$config['storeId']}/status";
+
+            try {
+                $current = $this->request('GET', $statusUrl, $token);
+                if (strtoupper((string) ($current['status'] ?? '')) === $status) {
+                    return ['success' => true, 'message' => 'Deliveroo site is already '.$status, 'data' => ['status' => $status]];
+                }
+            } catch (Throwable) {
+                // Ignore - attempt the update below anyway.
+            }
+
+            $result = $this->request('PUT', $statusUrl, $token, ['status' => $status]);
 
             return ['success' => true, 'message' => 'Deliveroo site status set to '.$status, 'data' => $result ?? ['status' => $status]];
+        } catch (RequestException $error) {
+            $message = (string) ($error->response?->json('error.message') ?? '');
+            if (str_contains(strtolower($message), 'already')) {
+                return ['success' => true, 'message' => 'Deliveroo site is already '.$status];
+            }
+
+            return ['success' => false, 'message' => $this->errorMessage($error)];
         } catch (Throwable $error) {
             return ['success' => false, 'message' => $this->errorMessage($error)];
         }
